@@ -1,9 +1,11 @@
-use std::{error::Error, fs};
+use std::fs;
 
 use include_dir::Dir;
 use sqlite::Value;
 
-pub struct DatabaseManager {}
+pub struct DatabaseManager {
+    connection: sqlite::Connection,
+}
 
 static MIGRATION_DIR: Dir<'static> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/src/db/migrations");
@@ -20,34 +22,38 @@ pub enum DbError {
 
 impl DatabaseManager {
     pub fn new() -> Self {
-        // Initialize the database connection here
         DatabaseManager {
-            // ...
+            connection: DatabaseManager::open_connection().unwrap(),
         }
     }
 
-    pub fn get_connection(&self) -> Result<sqlite::Connection, DbError> {
-        // Return a database connection
+    fn open_connection() -> Result<sqlite::Connection, DbError> {
         fs::create_dir_all("./data").map_err(DbError::FsError)?;
-        sqlite::open("./data/db.sqlite").map_err(DbError::SqliteError)
+        let db_path = "./data/db.sqlite";
+        let db_exists = fs::metadata(db_path).is_ok();
+        let conn = sqlite::open(db_path).map_err(DbError::SqliteError)?;
+        if !db_exists {
+            conn.execute("PRAGMA journal_mode=WAL;")?;
+        }
+        Ok(conn)
     }
 
     fn setup_migration_table(&self) -> Result<(), DbError> {
         println!("Setting up migration table...");
-        let conn = self.get_connection()?;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS migrations (
+        self.connection
+            .execute(
+                "CREATE TABLE IF NOT EXISTS migrations (
                 id TEXT PRIMARY KEY,
                 applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );",
-        )
-        .map_err(DbError::SqliteError)?;
+            )
+            .map_err(DbError::SqliteError)?;
         Ok(())
     }
 
     fn get_applied_migrations(&self) -> Result<Vec<String>, DbError> {
-        let conn = self.get_connection()?;
-        let mut stmt = conn
+        let mut stmt = self
+            .connection
             .prepare("SELECT id FROM migrations ORDER BY id;")
             .map_err(DbError::SqliteError)?;
         let mut rows = stmt.iter();
@@ -60,13 +66,11 @@ impl DatabaseManager {
     }
 
     fn apply_migration(&self, migration_id: &str, migration_sql: &str) {
-        // Apply the given migration SQL to the database
         println!("Applying migration: {}", migration_id);
-        let conn = self.get_connection().unwrap();
-        // TODO only apply new migrations
-        conn.execute(migration_sql).unwrap();
+        self.connection.execute(migration_sql).unwrap();
 
-        let mut statement = conn
+        let mut statement = self
+            .connection
             .prepare("INSERT INTO migrations (id) VALUES (:id);")
             .unwrap();
         statement
