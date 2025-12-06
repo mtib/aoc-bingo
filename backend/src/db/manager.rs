@@ -13,6 +13,7 @@ static MIGRATION_DIR: Dir<'static> =
 #[derive(thiserror::Error, Debug)]
 pub enum DbError {
     #[error("Unexpected error: {0}")]
+    #[allow(dead_code)]
     Unexpected(String),
     #[error("SQLite error: {0}")]
     SqliteError(#[from] sqlite::Error),
@@ -71,19 +72,30 @@ impl DatabaseManager {
 
         let mut statement = self
             .connection
-            .prepare("INSERT INTO migrations (id) VALUES (:id);")
+            .prepare("INSERT INTO migrations (id) VALUES (:id) RETURNING *;")
             .unwrap();
         statement
             .bind::<&[(_, Value)]>(&[(":id", migration_id.into())])
             .unwrap();
-        statement.next().unwrap();
+        for row in statement.iter() {
+            if row.is_err() {
+                continue;
+            }
+            let row = row.unwrap();
+            let applied_id = row.read::<&str, _>("id");
+            let applied_at = row.read::<&str, _>("applied_at");
+            println!(
+                "Migration applied: id={}, applied_at={}",
+                applied_id, applied_at
+            );
+        }
     }
 
     pub fn init(&self) {
         self.setup_migration_table().unwrap();
 
         let migrations = {
-            let mut migrations = MIGRATION_DIR.files().collect::<Vec<_>>();
+            let mut migrations = MIGRATION_DIR.files().collect::<Box<_>>();
             migrations.sort_by_key(|f| f.path().file_name().unwrap().to_str().unwrap());
             migrations
         };

@@ -6,6 +6,6 @@ pub struct HealthResponse {
 }
 
 #[get("/health")]
-pub fn index() -> Json<HealthResponse> {
+pub fn health() -> Json<HealthResponse> {
     Json(HealthResponse { status: "OK" })
 }
