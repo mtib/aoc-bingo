@@ -1,5 +1,6 @@
 use std::fs;
 
+use chrono::DateTime;
 use include_dir::Dir;
 use sqlite::Value;
 
@@ -28,6 +29,10 @@ impl DatabaseManager {
         }
     }
 
+    pub fn get_connection(&self) -> &sqlite::Connection {
+        &self.connection
+    }
+
     fn open_connection() -> Result<sqlite::Connection, DbError> {
         fs::create_dir_all("./data").map_err(DbError::FsError)?;
         let db_path = "./data/db.sqlite";
@@ -45,7 +50,7 @@ impl DatabaseManager {
             .execute(
                 "CREATE TABLE IF NOT EXISTS migrations (
                 id TEXT PRIMARY KEY,
-                applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                applied_at INTEGER DEFAULT (unixepoch())
             );",
             )
             .map_err(DbError::SqliteError)?;
@@ -83,7 +88,8 @@ impl DatabaseManager {
             }
             let row = row.unwrap();
             let applied_id = row.read::<&str, _>("id");
-            let applied_at = row.read::<&str, _>("applied_at");
+            let applied_at =
+                DateTime::from_timestamp_secs(row.read::<i64, _>("applied_at")).unwrap();
             println!(
                 "Migration applied: id={}, applied_at={}",
                 applied_id, applied_at
