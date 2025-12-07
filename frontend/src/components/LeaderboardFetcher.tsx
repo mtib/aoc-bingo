@@ -2,12 +2,17 @@
 
 import { useState } from 'react';
 import { Box, Card, CardContent, Typography, TextField, Button, Alert, Paper } from '@mui/material';
+import { useStorageState } from 'react-use-storage-state';
 import { api } from '@/lib/api';
 
-export default function LeaderboardFetcher() {
-  const [year, setYear] = useState<string>('2025');
-  const [boardId, setBoardId] = useState<string>('');
-  const [sessionToken, setSessionToken] = useState<string>('');
+// Source - https://stackoverflow.com/a/71566404
+// Posted by Ahmed Abdelbaset, modified by community. See post 'Timeline' for change history
+// Retrieved 2025-12-07, License - CC BY-SA 4.0
+
+function LeaderboardFetcher() {
+  const [year, setYear] = useStorageState('leaderboard-year', '2025');
+  const [boardId, setBoardId] = useStorageState('leaderboard-boardId', '');
+  const [sessionToken, setSessionToken] = useStorageState('leaderboard-sessionToken', '');
   const [leaderboardData, setLeaderboardData] = useState<any>(null);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
@@ -93,3 +98,5 @@ export default function LeaderboardFetcher() {
     </Card>
   );
 }
+
+export default LeaderboardFetcher;

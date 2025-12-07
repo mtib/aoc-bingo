@@ -4,7 +4,12 @@ import { useEffect, useState, useMemo } from 'react';
 import { CheckCircle, XCircle, AlertCircle, Loader } from 'lucide-react';
 import { AppBar, Toolbar, Typography, Box, Tooltip, Stack, Paper } from '@mui/material';
 import { api } from '@/lib/api';
-import LeaderboardFetcher from '@/components/LeaderboardFetcher';
+import dynamic from 'next/dynamic';
+
+// Source - https://stackoverflow.com/a/71566404
+// Posted by Ahmed Abdelbaset, modified by community. See post 'Timeline' for change history
+// Retrieved 2025-12-07, License - CC BY-SA 4.0
+const LeaderboardFetcher = dynamic(() => import('@/components/LeaderboardFetcher'), { ssr: false });
 
 interface HealthResponse {
   status: string;
