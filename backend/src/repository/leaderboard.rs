@@ -20,7 +20,7 @@ impl TryFrom<Row> for LeaderboardDto {
             id,
             year,
             board_id,
-            data,
+            data: serde_json::from_str(&data).unwrap(),
             created_at: DateTime::from_timestamp_secs(created_at).unwrap(),
             updated_at: DateTime::from_timestamp_secs(updated_at).unwrap(),
         })

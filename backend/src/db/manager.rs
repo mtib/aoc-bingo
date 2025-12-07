@@ -2,10 +2,14 @@ use std::fs;
 
 use chrono::DateTime;
 use include_dir::Dir;
-use sqlite::Value;
+use sqlite::{Connection, Value};
 
 pub struct DatabaseManager {
     connection: sqlite::Connection,
+}
+
+pub fn get_db() -> Result<Connection, DbError> {
+    DatabaseManager::open_connection()
 }
 
 static MIGRATION_DIR: Dir<'static> =

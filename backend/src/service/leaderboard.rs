@@ -1,8 +1,13 @@
+use std::collections::HashMap;
+
 use thiserror::Error;
 
 use crate::{
-    client::AocClient, db::DatabaseManager, model::leaderboard::LeaderboardDto,
+    client::AocClient,
+    db::{DatabaseManager, get_db},
+    model::{aoc::AocPuzzle, leaderboard::LeaderboardDto},
     repository::LeaderboardRepository,
+    service::aoc_utils::AocUtils,
 };
 
 pub struct LeaderboardService {}
@@ -19,6 +24,14 @@ pub enum LeaderboardError {
     ParseError(#[from] serde_json::Error),
 }
 
+#[derive(Error, Debug)]
+pub enum BingoError {
+    #[error("No valid bingo options available.")]
+    NoOptions,
+    #[error("Leaderboard error: {0}")]
+    LeaderboardError(#[from] LeaderboardError),
+}
+
 impl LeaderboardService {
     pub fn new() -> Self {
         LeaderboardService {}
@@ -33,9 +46,8 @@ impl LeaderboardService {
     ) -> Result<LeaderboardDto, LeaderboardError> {
         let lbr = LeaderboardRepository::new();
         {
-            let dbm = DatabaseManager::new();
-            let conn = dbm.get_connection();
-            if let Some(cached) = lbr.get_leaderboard(conn, year, board_id) {
+            let conn = get_db().unwrap();
+            if let Some(cached) = lbr.get_leaderboard(&conn, year, board_id) {
                 return Ok(cached);
             }
 
@@ -55,5 +67,50 @@ impl LeaderboardService {
                 lbr.save_leaderboard(dbm.get_connection(), year, board_id, &data)
                     .map_err(LeaderboardError::DatabaseError)
             })
+    }
+
+    pub async fn get_or_create_leaderboard_range(
+        &self,
+        years: &[u32],
+        board_id: u32,
+        session_token: Option<&str>,
+    ) -> Vec<Result<LeaderboardDto, LeaderboardError>> {
+        let mut results = Vec::new();
+        for &year in years {
+            match self
+                .get_or_create_leaderboard(year, board_id, session_token)
+                .await
+            {
+                Ok(leaderboard) => results.push(Ok(leaderboard)),
+                Err(e) => results.push(Err(e)),
+            }
+        }
+        results
+    }
+
+    pub async fn get_bingo_options(
+        &self,
+        years: &[u32],
+        board_id: u32,
+        session_token: Option<&str>,
+    ) -> Result<Vec<AocPuzzle>, BingoError> {
+        let leaderboards = self
+            .get_or_create_leaderboard_range(years, board_id, session_token)
+            .await
+            .into_iter()
+            .filter_map(|r| r.ok().map(|l| (l.year, l)))
+            .collect::<HashMap<i64, LeaderboardDto>>();
+
+        let all_puzzles = AocUtils::puzzles_for_years(years);
+
+        let mut bingo_options = Vec::<AocPuzzle>::new();
+
+        for puzzle in all_puzzles {
+            let year = puzzle.date.year;
+            let day = puzzle.date.day;
+
+            todo!()
+        }
+        todo!()
     }
 }
