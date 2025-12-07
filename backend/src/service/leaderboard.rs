@@ -142,7 +142,19 @@ impl LeaderboardService {
                                     })
                                     .unwrap_or(false)
                             });
-                        if !nobody_solved_but_meeting_requirements {
+                        // Or nobody has solved at all
+                        let nobody_solved_at_all =
+                            leaderboard.data.members.values().all(|member| {
+                                member
+                                    .completion_day_level
+                                    .get(&day)
+                                    .map(|day_completion| {
+                                        day_completion.get(&AocPart::One.into()).is_none()
+                                            && day_completion.get(&AocPart::Two.into()).is_none()
+                                    })
+                                    .unwrap_or(true)
+                            });
+                        if !nobody_solved_but_meeting_requirements && !nobody_solved_at_all {
                             continue;
                         }
                     }

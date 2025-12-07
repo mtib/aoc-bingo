@@ -51,6 +51,15 @@ impl AocUtils {
             .flatten()
             .collect()
     }
+    pub fn estimate_difficulty(puzzle: &AocPuzzle) -> u32 {
+        let year_progression = (puzzle.date.day - 1) as f64
+            / (Self::get_calendar_size_of_year(puzzle.date.year).unwrap() - 1) as f64;
+        (year_progression * 5.0 + 1.0).floor() as u32
+            + match puzzle.part {
+                AocPart::One => 0,
+                AocPart::Two => 2,
+            }
+    }
 }
 
 #[cfg(test)]
