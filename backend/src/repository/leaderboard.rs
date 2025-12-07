@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sqlite::{Connection, Value};
+use sqlite::{Connection, Row, Value};
 
 pub struct LeaderboardRepository;
 
@@ -10,6 +10,28 @@ pub struct LeaderboardDto {
     pub data: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl TryFrom<Row> for LeaderboardDto {
+    type Error = sqlite::Error;
+
+    fn try_from(row: Row) -> Result<Self, Self::Error> {
+        let id: i64 = row.try_read("id")?;
+        let year: i64 = row.try_read("year")?;
+        let board_id: i64 = row.try_read("leaderboard_id")?;
+        let data = row.try_read::<&str, _>("data")?.to_owned();
+        let created_at = row.try_read::<i64, _>("created_at")?.to_owned();
+        let updated_at = row.try_read::<i64, _>("updated_at")?.to_owned();
+
+        Ok(LeaderboardDto {
+            id,
+            year,
+            board_id,
+            data,
+            created_at: DateTime::from_timestamp_secs(created_at).unwrap(),
+            updated_at: DateTime::from_timestamp_secs(updated_at).unwrap(),
+        })
+    }
 }
 
 impl LeaderboardRepository {
@@ -59,24 +81,62 @@ impl LeaderboardRepository {
                 (":board_id", (board_id as i64).into()),
             ])
             .unwrap();
-        if let Some(Ok(row)) = statement.iter().next() {
-            let id: i64 = row.read("id");
-            let year: i64 = row.read("year");
-            let board_id: i64 = row.read("leaderboard_id");
-            let data = row.read::<&str, _>("data").to_owned();
-            let created_at = row.read::<i64, _>("created_at").to_owned();
-            let updated_at = row.read::<i64, _>("updated_at").to_owned();
-
-            Some(LeaderboardDto {
-                id,
-                year,
-                board_id,
-                data,
-                created_at: DateTime::from_timestamp_secs(created_at).unwrap(),
-                updated_at: DateTime::from_timestamp_secs(updated_at).unwrap(),
+        statement
+            .into_iter()
+            .next()
+            .and_then(|result| match result {
+                Ok(row) => match row.try_into() {
+                    Ok(dto) => Some(dto),
+                    Err(e) => {
+                        eprintln!(
+                            "Failed to convert row to LeaderboardDto for year={}, board_id={}: {:?}",
+                            year, board_id, e
+                        );
+                        None
+                    }
+                },
+                Err(e) => {
+                    eprintln!(
+                        "Database error fetching leaderboard for year={}, board_id={}: {:?}",
+                        year, board_id, e
+                    );
+                    None
+                }
             })
-        } else {
-            None
+    }
+
+    pub fn get_all_leaderboard_by_id(
+        &self,
+        conn: &Connection,
+        board_id: u32,
+    ) -> Vec<LeaderboardDto> {
+        let mut statement = conn
+            .prepare("SELECT * FROM leaderboard_cache WHERE leaderboard_id = :board_id ORDER BY year ASC;")
+            .unwrap();
+        statement
+            .bind::<&[(_, Value)]>(&[(":board_id", (board_id as i64).into())])
+            .unwrap();
+
+        let mut leaderboards = Vec::new();
+        for row_result in statement.iter() {
+            match row_result {
+                Ok(row) => match row.try_into() {
+                    Ok(dto) => leaderboards.push(dto),
+                    Err(e) => {
+                        eprintln!(
+                            "Failed to convert row to LeaderboardDto for board_id={}: {:?}",
+                            board_id, e
+                        );
+                    }
+                },
+                Err(e) => {
+                    eprintln!(
+                        "Database error fetching leaderboard for board_id={}: {:?}",
+                        board_id, e
+                    );
+                }
+            }
         }
+        leaderboards
     }
 }
