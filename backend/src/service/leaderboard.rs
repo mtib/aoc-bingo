@@ -5,7 +5,10 @@ use thiserror::Error;
 use crate::{
     client::AocClient,
     db::{DatabaseManager, get_db},
-    model::{aoc::AocPuzzle, leaderboard::LeaderboardDto},
+    model::{
+        aoc::{AocPart, AocPuzzle},
+        leaderboard::LeaderboardDto,
+    },
     repository::LeaderboardRepository,
     service::aoc_utils::AocUtils,
 };
@@ -98,8 +101,8 @@ impl LeaderboardService {
             .get_or_create_leaderboard_range(years, board_id, session_token)
             .await
             .into_iter()
-            .filter_map(|r| r.ok().map(|l| (l.year, l)))
-            .collect::<HashMap<i64, LeaderboardDto>>();
+            .filter_map(|r| r.ok().map(|l| (l.year as u32, l)))
+            .collect::<HashMap<_, _>>();
 
         let all_puzzles = AocUtils::puzzles_for_years(years);
 
@@ -109,8 +112,50 @@ impl LeaderboardService {
             let year = puzzle.date.year;
             let day = puzzle.date.day;
 
-            todo!()
+            if let Some(leaderboard) = leaderboards.get(&year) {
+                match puzzle.part {
+                    AocPart::One => {
+                        // If part one is requested, ensure nobody has solved it
+                        let nobody_solved = leaderboard.data.members.values().all(|member| {
+                            member
+                                .completion_day_level
+                                .get(&day)
+                                .map(|day_completion| {
+                                    day_completion.get(&AocPart::One.into()).is_none()
+                                })
+                                .unwrap_or(true)
+                        });
+                        if !nobody_solved {
+                            continue;
+                        }
+                    }
+                    AocPart::Two => {
+                        // If part two is requested, ensure part one is solved for everyone
+                        let nobody_solved_but_meeting_requirements =
+                            leaderboard.data.members.values().all(|member| {
+                                member
+                                    .completion_day_level
+                                    .get(&day)
+                                    .map(|day_completion| {
+                                        day_completion.get(&AocPart::One.into()).is_some()
+                                            && day_completion.get(&AocPart::Two.into()).is_none()
+                                    })
+                                    .unwrap_or(false)
+                            });
+                        if !nobody_solved_but_meeting_requirements {
+                            continue;
+                        }
+                    }
+                }
+                bingo_options.push(puzzle);
+            } else {
+                bingo_options.push(puzzle);
+            }
         }
-        todo!()
+        if bingo_options.is_empty() {
+            Err(BingoError::NoOptions)
+        } else {
+            Ok(bingo_options)
+        }
     }
 }

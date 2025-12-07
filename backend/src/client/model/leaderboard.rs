@@ -4,26 +4,26 @@
 /// ```
 #[derive(Clone, serde::Deserialize, serde::Serialize, Debug)]
 pub struct LeaderboardResponse {
-    event: String,
-    day1_ts: u64,
-    members: std::collections::HashMap<u32, MemberResponse>,
-    owner_id: u32,
-    num_days: u32,
+    pub event: String,
+    pub day1_ts: u64,
+    pub members: std::collections::HashMap<u32, MemberResponse>,
+    pub owner_id: u32,
+    pub num_days: u32,
 }
 
 #[derive(Clone, serde::Deserialize, serde::Serialize, Debug)]
 pub struct MemberResponse {
-    id: u32,
-    local_score: u32,
-    completion_day_level:
+    pub id: u32,
+    pub local_score: u32,
+    pub completion_day_level:
         std::collections::HashMap<u32, std::collections::HashMap<u32, StarInfoResponse>>,
-    name: String,
-    last_star_ts: u64,
-    stars: u32,
+    pub name: String,
+    pub last_star_ts: u64,
+    pub stars: u32,
 }
 
 #[derive(Clone, serde::Deserialize, serde::Serialize, Debug)]
 pub struct StarInfoResponse {
-    get_star_ts: u64,
-    star_index: u32,
+    pub get_star_ts: u64,
+    pub star_index: u32,
 }

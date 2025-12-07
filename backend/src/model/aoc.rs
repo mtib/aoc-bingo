@@ -31,6 +31,15 @@ pub enum AocPart {
     Two,
 }
 
+impl Into<u32> for AocPart {
+    fn into(self) -> u32 {
+        match self {
+            AocPart::One => 1,
+            AocPart::Two => 2,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, serde::Serialize, serde::Deserialize, Hash)]
 pub struct PuzzleDate {
     pub year: u32,
