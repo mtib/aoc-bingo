@@ -1,16 +1,9 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use sqlite::{Connection, Row, Value};
 
-pub struct LeaderboardRepository;
+use crate::model::leaderboard::LeaderboardDto;
 
-pub struct LeaderboardDto {
-    pub id: i64,
-    pub year: i64,
-    pub board_id: i64,
-    pub data: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
+pub struct LeaderboardRepository;
 
 impl TryFrom<Row> for LeaderboardDto {
     type Error = sqlite::Error;
@@ -45,25 +38,26 @@ impl LeaderboardRepository {
         year: u32,
         board_id: u32,
         data: &str,
-    ) -> Result<(), sqlite::Error> {
+    ) -> Result<LeaderboardDto, sqlite::Error> {
         let mut statement = conn.prepare(
             "INSERT INTO leaderboard_cache (year, leaderboard_id, data)
              VALUES (:year, :board_id, :data)
              ON CONFLICT(year, leaderboard_id) DO UPDATE SET
              data = :data,
-             updated_at = :updated_at;",
+             updated_at = :updated_at
+             RETURNING *;",
         )?;
         statement.bind::<&[(_, Value)]>(&[
             (":year", (year as i64).into()),
             (":board_id", (board_id as i64).into()),
             (":data", data.into()),
         ])?;
-        while let Ok(state) = statement.next() {
-            if state == sqlite::State::Done {
-                break;
-            }
+
+        match self.consume_statement_as_leaderboard(&mut statement) {
+            Ok(Some(dto)) => Ok(dto),
+            Ok(None) => panic!("Expected leaderboard to be returned after insert/update."),
+            Err(e) => Err(e),
         }
-        Ok(())
     }
 
     pub fn get_leaderboard(
@@ -81,28 +75,9 @@ impl LeaderboardRepository {
                 (":board_id", (board_id as i64).into()),
             ])
             .unwrap();
-        statement
-            .into_iter()
-            .next()
-            .and_then(|result| match result {
-                Ok(row) => match row.try_into() {
-                    Ok(dto) => Some(dto),
-                    Err(e) => {
-                        eprintln!(
-                            "Failed to convert row to LeaderboardDto for year={}, board_id={}: {:?}",
-                            year, board_id, e
-                        );
-                        None
-                    }
-                },
-                Err(e) => {
-                    eprintln!(
-                        "Database error fetching leaderboard for year={}, board_id={}: {:?}",
-                        year, board_id, e
-                    );
-                    None
-                }
-            })
+        self.consume_statement_as_leaderboard(&mut statement)
+            .ok()
+            .flatten()
     }
 
     pub fn get_all_leaderboard_by_id(
@@ -138,5 +113,38 @@ impl LeaderboardRepository {
             }
         }
         leaderboards
+    }
+
+    fn consume_statement(&self, statement: &mut sqlite::Statement) -> Result<(), sqlite::Error> {
+        while let Ok(state) = statement.next() {
+            if state == sqlite::State::Done {
+                break;
+            }
+        }
+        Ok(())
+    }
+
+    fn consume_statement_as_leaderboard(
+        &self,
+        statement: &mut sqlite::Statement,
+    ) -> Result<Option<LeaderboardDto>, sqlite::Error> {
+        let result = match statement.iter().next() {
+            None => Ok(None),
+            Some(row) => match row {
+                Ok(row) => match row.try_into() {
+                    Ok(dto) => Ok(Some(dto)),
+                    Err(e) => {
+                        eprintln!("Failed to convert row to LeaderboardDto: {:?}", e);
+                        Err(e)
+                    }
+                },
+                Err(e) => {
+                    eprintln!("Database error fetching leaderboard: {:?}", e);
+                    Err(e)
+                }
+            },
+        };
+        self.consume_statement(statement)?;
+        result
     }
 }
