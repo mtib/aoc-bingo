@@ -7,7 +7,7 @@ use crate::{
     db::{DatabaseManager, get_db},
     model::{
         aoc::{AocPart, AocPuzzle},
-        leaderboard::LeaderboardDto,
+        leaderboard::{AocMemberId, LeaderboardDto},
     },
     repository::LeaderboardRepository,
     service::aoc_utils::AocUtils,
@@ -96,6 +96,7 @@ impl LeaderboardService {
         years: Option<&[u32]>,
         board_id: u32,
         session_token: Option<&str>,
+        member_ids: Option<&[AocMemberId]>,
     ) -> Result<Vec<AocPuzzle>, BingoError> {
         let years = match years {
             Some(y) => y.to_vec(),
@@ -117,10 +118,19 @@ impl LeaderboardService {
             let day = puzzle.date.day;
 
             if let Some(leaderboard) = leaderboards.get(&year) {
+                let member_data: Vec<_> = leaderboard
+                    .data
+                    .members
+                    .values()
+                    .filter(|m| match member_ids {
+                        Some(ids) => ids.contains(&m.id),
+                        None => true,
+                    })
+                    .collect();
                 match puzzle.part {
                     AocPart::One => {
                         // If part one is requested, ensure nobody has solved it
-                        let nobody_solved = leaderboard.data.members.values().all(|member| {
+                        let nobody_solved = member_data.iter().all(|member| {
                             member
                                 .completion_day_level
                                 .get(&day)
@@ -136,7 +146,7 @@ impl LeaderboardService {
                     AocPart::Two => {
                         // If part two is requested, ensure part one is solved for everyone
                         let nobody_solved_but_meeting_requirements =
-                            leaderboard.data.members.values().all(|member| {
+                            member_data.iter().all(|member| {
                                 member
                                     .completion_day_level
                                     .get(&day)
@@ -147,17 +157,16 @@ impl LeaderboardService {
                                     .unwrap_or(false)
                             });
                         // Or nobody has solved at all
-                        let nobody_solved_at_all =
-                            leaderboard.data.members.values().all(|member| {
-                                member
-                                    .completion_day_level
-                                    .get(&day)
-                                    .map(|day_completion| {
-                                        day_completion.get(&AocPart::One.into()).is_none()
-                                            && day_completion.get(&AocPart::Two.into()).is_none()
-                                    })
-                                    .unwrap_or(true)
-                            });
+                        let nobody_solved_at_all = member_data.iter().all(|member| {
+                            member
+                                .completion_day_level
+                                .get(&day)
+                                .map(|day_completion| {
+                                    day_completion.get(&AocPart::One.into()).is_none()
+                                        && day_completion.get(&AocPart::Two.into()).is_none()
+                                })
+                                .unwrap_or(true)
+                        });
                         if !nobody_solved_but_meeting_requirements && !nobody_solved_at_all {
                             continue;
                         }

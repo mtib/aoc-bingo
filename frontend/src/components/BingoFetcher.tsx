@@ -1,9 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Card, CardContent, Typography, TextField, Button, Alert, Paper, Slider, Collapse } from '@mui/material';
+import { Box, Card, CardContent, Typography, TextField, Button, Alert, Paper, Slider, Collapse, Autocomplete, Chip } from '@mui/material';
 import { api } from '@/lib/api';
 import { useLeaderboardContext } from '@/contexts/LeaderboardContext';
+
+interface Member {
+  id: number;
+  name: string;
+}
+
+interface LeaderboardData {
+  data: {
+    members: Record<string, Member>;
+  };
+}
 
 function BingoFetcher() {
   const { boardId, setBoardId, sessionToken, setSessionToken } = useLeaderboardContext();
@@ -11,6 +22,34 @@ function BingoFetcher() {
   const [bingoData, setBingoData] = useState<any>(null);
   const [bingoError, setBingoError] = useState<string | null>(null);
   const [bingoLoading, setBingoLoading] = useState(false);
+
+  const [members, setMembers] = useState<Member[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<Member[]>([]);
+  const [fetchingUsers, setFetchingUsers] = useState(false);
+  const [fetchUsersError, setFetchUsersError] = useState<string | null>(null);
+
+  const fetchUsers = async () => {
+    setFetchingUsers(true);
+    setFetchUsersError(null);
+
+    try {
+      const response = await api.post<LeaderboardData>('/leaderboard', {
+        year: 2015,
+        board_id: parseInt(boardId),
+        session_token: sessionToken
+      });
+
+      const membersArray = Object.values(response.data.members);
+      setMembers(membersArray);
+      console.log('Fetched users:', membersArray);
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Failed to fetch users';
+      console.error('Fetch users error:', err);
+      setFetchUsersError(errorMsg);
+    } finally {
+      setFetchingUsers(false);
+    }
+  };
 
   const fetchBingo = async () => {
     setBingoLoading(true);
@@ -21,6 +60,7 @@ function BingoFetcher() {
       const response = await api.post('/leaderboard/bingo/all', {
         board_id: parseInt(boardId),
         session_token: sessionToken,
+        member_ids: selectedMembers.map(m => m.id),
         difficulty: difficulty
       });
       console.log('Bingo response:', response);
@@ -61,6 +101,46 @@ function BingoFetcher() {
             onChange={(e) => setSessionToken(e.target.value)}
             fullWidth
           />
+
+          <Button
+            variant="outlined"
+            onClick={fetchUsers}
+            disabled={fetchingUsers || !boardId || !sessionToken}
+          >
+            {fetchingUsers ? 'Loading Users...' : 'Fetch Users'}
+          </Button>
+
+          <Collapse in={!!fetchUsersError}>
+            <Alert severity="error">
+              {fetchUsersError}
+            </Alert>
+          </Collapse>
+
+          <Collapse in={members.length > 0}>
+            <Autocomplete
+              multiple
+              options={members}
+              getOptionLabel={(option) => option.name}
+              value={selectedMembers}
+              onChange={(_, newValue) => setSelectedMembers(newValue)}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  label="Select Users"
+                  placeholder="Choose users..."
+                />
+              )}
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => (
+                  <Chip
+                    {...getTagProps({ index })}
+                    key={option.id}
+                    label={option.name}
+                  />
+                ))
+              }
+            />
+          </Collapse>
           <Box sx={{ px: 1 }}>
             <Typography gutterBottom>
               Difficulty: {difficulty.toFixed(1)}
@@ -83,7 +163,7 @@ function BingoFetcher() {
           <Button
             variant="contained"
             onClick={fetchBingo}
-            disabled={bingoLoading || !boardId || !sessionToken}
+            disabled={bingoLoading || !boardId || !sessionToken || selectedMembers.length === 0}
           >
             {bingoLoading ? 'Loading...' : 'Generate Bingo Options'}
           </Button>

@@ -1,7 +1,6 @@
 'use client';
 
-import { createContext, useContext, ReactNode } from 'react';
-import { useStorageState } from 'react-use-storage-state';
+import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
 
 interface LeaderboardContextType {
   year: string;
@@ -15,9 +14,40 @@ interface LeaderboardContextType {
 const LeaderboardContext = createContext<LeaderboardContextType | undefined>(undefined);
 
 export function LeaderboardProvider({ children }: { children: ReactNode }) {
-  const [year, setYear] = useStorageState('leaderboard-year', '2025');
-  const [boardId, setBoardId] = useStorageState('leaderboard-boardId', '');
-  const [sessionToken, setSessionToken] = useStorageState('leaderboard-sessionToken', '');
+  const [year, setYearState] = useState('2025');
+  const [boardId, setBoardIdState] = useState('');
+  const [sessionToken, setSessionTokenState] = useState('');
+  const [isClient, setIsClient] = useState(false);
+
+  // Initialize from localStorage on client mount
+  useEffect(() => {
+    setIsClient(true);
+    setYearState(localStorage.getItem('leaderboard-year') || '2025');
+    setBoardIdState(localStorage.getItem('leaderboard-boardId') || '');
+    setSessionTokenState(localStorage.getItem('leaderboard-sessionToken') || '');
+  }, []);
+
+  // Persist to localStorage when values change
+  const setYear = (value: string) => {
+    setYearState(value);
+    if (isClient) {
+      localStorage.setItem('leaderboard-year', value);
+    }
+  };
+
+  const setBoardId = (value: string) => {
+    setBoardIdState(value);
+    if (isClient) {
+      localStorage.setItem('leaderboard-boardId', value);
+    }
+  };
+
+  const setSessionToken = (value: string) => {
+    setSessionTokenState(value);
+    if (isClient) {
+      localStorage.setItem('leaderboard-sessionToken', value);
+    }
+  };
 
   return (
     <LeaderboardContext.Provider

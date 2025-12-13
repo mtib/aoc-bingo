@@ -2,7 +2,8 @@ use rocket::{http::Status, post, serde::json::Json};
 
 use crate::{
     model::leaderboard::{
-        LeaderboardDto, ShuffleLeaderboardDataDto, ShuffleLeaderboardDayDto, ShuffleLeaderboardDto,
+        AocMemberId, LeaderboardDto, ShuffleLeaderboardDataDto, ShuffleLeaderboardDayDto,
+        ShuffleLeaderboardDto,
     },
     service::LeaderboardService,
 };
@@ -36,6 +37,7 @@ pub async fn index(
 pub struct BingoAllRequest {
     board_id: u32,
     session_token: String,
+    member_ids: Vec<AocMemberId>,
     /// Optional difficulty filter: 0.1 (easy) to 0.9 (hard)
     ///
     /// if < 0.5 => uses `1 - difficulty` as chance to skip hard puzzles
@@ -51,8 +53,13 @@ pub async fn bingo_all(
 
     let puzzles_result = {
         let lbs = LeaderboardService::new();
-        lbs.get_bingo_options(None, req.board_id, Some(&req.session_token))
-            .await
+        lbs.get_bingo_options(
+            None,
+            req.board_id,
+            Some(&req.session_token),
+            Some(&req.member_ids),
+        )
+        .await
     };
 
     let puzzles = match puzzles_result {

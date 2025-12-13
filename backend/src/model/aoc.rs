@@ -70,7 +70,11 @@ impl PuzzleDate {
     pub fn latest_of_year_by_date(year: u32, date: &DateTime<Utc>) -> Option<Self> {
         let current_year = date.year() as u32;
         if current_year == year && date.month() == 12 {
-            Some(PuzzleDate::new(year, date.day().min(25)))
+            Some(PuzzleDate::new(
+                year,
+                date.day()
+                    .min(AocUtils::get_calendar_size_of_year(year).unwrap()),
+            ))
         } else {
             match AocUtils::get_calendar_size_of_year(year) {
                 Ok(size) => Some(PuzzleDate { year, day: size }),
