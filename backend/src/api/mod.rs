@@ -11,8 +11,10 @@ trait ConfigureRocket {
 
 impl ConfigureRocket for rocket::Rocket<rocket::Build> {
     fn mount_routes(self: Self) -> Self {
-        self.mount("/", routes![health::health])
-            .mount("/leaderboard", routes![leaderboard::index])
+        self.mount("/", routes![health::health]).mount(
+            "/leaderboard",
+            routes![leaderboard::index, leaderboard::bingo_all],
+        )
     }
 
     fn config(self: Self) -> Self {

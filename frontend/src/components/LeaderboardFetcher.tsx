@@ -1,18 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Box, Card, CardContent, Typography, TextField, Button, Alert, Paper } from '@mui/material';
-import { useStorageState } from 'react-use-storage-state';
+import { Box, Card, CardContent, Typography, TextField, Button, Alert, Paper, Collapse } from '@mui/material';
 import { api } from '@/lib/api';
+import { useLeaderboardContext } from '@/contexts/LeaderboardContext';
 
 // Source - https://stackoverflow.com/a/71566404
 // Posted by Ahmed Abdelbaset, modified by community. See post 'Timeline' for change history
 // Retrieved 2025-12-07, License - CC BY-SA 4.0
 
 function LeaderboardFetcher() {
-  const [year, setYear] = useStorageState('leaderboard-year', '2025');
-  const [boardId, setBoardId] = useStorageState('leaderboard-boardId', '');
-  const [sessionToken, setSessionToken] = useStorageState('leaderboard-sessionToken', '');
+  const { year, setYear, boardId, setBoardId, sessionToken, setSessionToken } = useLeaderboardContext();
   const [leaderboardData, setLeaderboardData] = useState<any>(null);
   const [leaderboardError, setLeaderboardError] = useState<string | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
@@ -40,7 +38,7 @@ function LeaderboardFetcher() {
   };
 
   return (
-    <Card sx={{ maxWidth: 600, mx: 'auto' }}>
+    <Card>
       <CardContent>
         <Typography variant="h5" component="h2" gutterBottom>
           Fetch Leaderboard
@@ -76,13 +74,13 @@ function LeaderboardFetcher() {
           </Button>
         </Box>
 
-        {leaderboardError && (
+        <Collapse in={!!leaderboardError}>
           <Alert severity="error" sx={{ mt: 2 }}>
             {leaderboardError}
           </Alert>
-        )}
+        </Collapse>
 
-        {leaderboardData && (
+        <Collapse in={!!leaderboardData}>
           <Box sx={{ mt: 2 }}>
             <Typography variant="h6" gutterBottom>
               Response:
@@ -93,7 +91,7 @@ function LeaderboardFetcher() {
               </pre>
             </Paper>
           </Box>
-        )}
+        </Collapse>
       </CardContent>
     </Card>
   );

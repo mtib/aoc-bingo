@@ -1,7 +1,7 @@
 use chrono::DateTime;
 use sqlite::{Connection, Row, Value};
 
-use crate::model::leaderboard::LeaderboardDto;
+use crate::model::leaderboard::{AocLeaderboardId, AocLeaderboardYearId, LeaderboardDto, Year};
 
 pub struct LeaderboardRepository;
 
@@ -17,9 +17,9 @@ impl TryFrom<Row> for LeaderboardDto {
         let updated_at = row.try_read::<i64, _>("updated_at")?.to_owned();
 
         Ok(LeaderboardDto {
-            id,
-            year,
-            board_id,
+            id: id as AocLeaderboardYearId,
+            year: year as Year,
+            board_id: board_id as AocLeaderboardId,
             data: serde_json::from_str(&data).unwrap(),
             created_at: DateTime::from_timestamp_secs(created_at).unwrap(),
             updated_at: DateTime::from_timestamp_secs(updated_at).unwrap(),

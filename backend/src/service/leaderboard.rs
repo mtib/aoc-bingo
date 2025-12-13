@@ -93,18 +93,22 @@ impl LeaderboardService {
 
     pub async fn get_bingo_options(
         &self,
-        years: &[u32],
+        years: Option<&[u32]>,
         board_id: u32,
         session_token: Option<&str>,
     ) -> Result<Vec<AocPuzzle>, BingoError> {
+        let years = match years {
+            Some(y) => y.to_vec(),
+            None => (AocUtils::earliest_puzzle().year..=AocUtils::latest_puzzle().year).collect(),
+        };
         let leaderboards = self
-            .get_or_create_leaderboard_range(years, board_id, session_token)
+            .get_or_create_leaderboard_range(&years, board_id, session_token)
             .await
             .into_iter()
             .filter_map(|r| r.ok().map(|l| (l.year as u32, l)))
             .collect::<HashMap<_, _>>();
 
-        let all_puzzles = AocUtils::puzzles_for_years(years);
+        let all_puzzles = AocUtils::puzzles_for_years(&years);
 
         let mut bingo_options = Vec::<AocPuzzle>::new();
 

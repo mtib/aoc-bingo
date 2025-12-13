@@ -10,6 +10,7 @@ import dynamic from 'next/dynamic';
 // Posted by Ahmed Abdelbaset, modified by community. See post 'Timeline' for change history
 // Retrieved 2025-12-07, License - CC BY-SA 4.0
 const LeaderboardFetcher = dynamic(() => import('@/components/LeaderboardFetcher'), { ssr: false });
+const BingoFetcher = dynamic(() => import('@/components/BingoFetcher'), { ssr: false });
 
 interface HealthResponse {
   status: string;
@@ -91,7 +92,10 @@ export default function Home() {
         </Stack >
       </Paper>
       <Box sx={{ p: 3 }}>
-        <LeaderboardFetcher />
+        <Stack spacing={3} maxWidth="800px" margin="0 auto">
+          <LeaderboardFetcher />
+          <BingoFetcher />
+        </Stack>
       </Box>
     </>
   );
