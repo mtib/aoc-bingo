@@ -48,6 +48,7 @@ function RouteComponent() {
                                 solved ? (<span className={firstOnly ? 'first-only' : 'gold'}>*</span>) : ' '
                             )
                         })}
+                        {' '}{member.name}
                     </div>
                 ))}
 
@@ -75,7 +76,7 @@ function ColumnText({ year, day }: { year: number, day: number }) {
     const text = `${year % 100} ${day > 9 ? '' : ' '}${day}`;
     return (
         <div className="inline-block">
-            <a href="">
+            <a href={`https://adventofcode.com/${year}/day/${day}`} target="_blank" rel="noreferrer" title={`AoC ${year} Day ${day}`}>
                 {text.split('').join('\n')}
             </a>
         </div>
