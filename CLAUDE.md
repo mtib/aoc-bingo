@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AOC Bingo is a web application for Advent of Code leaderboard management and bingo card generation. The project consists of a Rust backend using Rocket and a Next.js frontend with Material-UI.
+AoC Bingo is a web application for Advent of Code leaderboard management and bingo card generation. The project consists of a Rust backend using Rocket and a Next.js frontend with Material-UI.
 
 ## Development Commands
 
