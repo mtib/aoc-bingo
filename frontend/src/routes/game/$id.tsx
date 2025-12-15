@@ -31,7 +31,7 @@ function RouteComponent() {
 
             <div className="py-4">
                 <div className='pre'>
-                    {" ".repeat(members.length.toString().length + maxScore.toString().length + 3)}{_.times(puzzleCount, (i) => {
+                    {" ".repeat(members.length.toString().length + maxScore.toString().length + 1)}<div className='inline-block'>{'Y\nY\n\nD\nD '}</div>{_.times(puzzleCount, (i) => {
                         return (
                             <ColumnText key={i} year={2024 + Math.floor(i / 25)} day={i % 25 + 1} />
                         )
