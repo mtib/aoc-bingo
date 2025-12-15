@@ -15,24 +15,16 @@ COPY . .
 # Build the application
 RUN bun run build
 
-# Runtime stage
-FROM oven/bun:1-slim
+# Production stage
+FROM caddy:2-alpine
 
-WORKDIR /app
+# Copy built files from builder stage
+COPY --from=builder /app/dist /srv
 
-# Copy necessary files from builder
-COPY --from=builder /app/next.config.ts ./
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+# Copy Caddyfile
+COPY Caddyfile /etc/caddy/Caddyfile
 
-# Expose the default Next.js port
-EXPOSE 3000
+# Expose port 80
+EXPOSE 80
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
-
-# Run the application
-CMD ["bun", "server.js"]
+# Caddy runs automatically via entrypoint
