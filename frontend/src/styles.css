@@ -89,6 +89,10 @@ button:focus {
   color: #99ff99;
 }
 
+p {
+  max-width: 55em;
+}
+
 input {
   color: inherit;
   border: 1px solid #666666;

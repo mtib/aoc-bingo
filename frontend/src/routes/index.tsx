@@ -7,9 +7,7 @@ export const Route = createFileRoute('/')({
 function App() {
     return (
         <>
-            <div className="App">
-                <p>Welcome to AoC Bingo. This website allows you to create <em>custom collections of puzzles</em> from the real Advent of Code for your private leaderboards.</p>
-            </div>
+            <p>Welcome to AoC Bingo. This website allows you to create <em>custom collections of puzzles</em> from the real Advent of Code for your private leaderboards.</p>
         </>
     )
 }
