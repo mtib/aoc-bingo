@@ -2,7 +2,6 @@
 
 body {
   @apply m-0;
-  @apply p-2;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
     "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
     sans-serif;
@@ -18,6 +17,34 @@ body {
   font-weight: 400;
   font-size: 18px;
   font-style: normal;
+}
+
+h1,
+h2 {
+  color: #ffffff;
+  font-size: 1em;
+  font-weight: 400;
+  @apply mb-[1rem];
+}
+
+h2 {
+  @apply mt-[1rem];
+}
+
+h1::before,
+h2::before {
+  content: '--- ';
+}
+
+em {
+  font-style: normal;
+  color: #fff;
+  filter: drop-shadow(0 0 4px #fff);
+}
+
+h1::after,
+h2::after {
+  content: ' ---';
 }
 
 a {
@@ -81,7 +108,7 @@ input {
 }
 
 .quiet {
-  opacity: .5;
+  opacity: .7;
 }
 
 .pre {

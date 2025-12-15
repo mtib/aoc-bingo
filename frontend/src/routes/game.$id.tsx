@@ -24,16 +24,17 @@ function RouteComponent() {
         return sortedMembers.length > 0 ? sortedMembers[0].score : 0;
     }, [sortedMembers])
 
-    const puzzleCount = 50;
+    const puzzleCount = 90;
     return (
         <>
-            <div>This is game room id={id}</div>
-
-            <div className="py-4">
+            <h1>Game Room {id}</h1>
+            <div>This is <em>game room</em> id={id}.</div>
+            <h2>Leaderboard</h2>
+            <div>
                 <div className='pre'>
-                    {" ".repeat(members.length.toString().length + maxScore.toString().length + 1)}<div className='inline-block'>{'Y\nY\n\nD\nD '}</div>{_.times(puzzleCount, (i) => {
+                    {" ".repeat(members.length.toString().length + maxScore.toString().length + 1)}<div className='inline-block'>{'Y\nY\n\nD\nD\n\nP '}</div>{_.times(puzzleCount, (i) => {
                         return (
-                            <ColumnText key={i} year={2024 + Math.floor(i / 25)} day={i % 25 + 1} />
+                            <ColumnText key={i} year={2024 + Math.floor(i / 2 / 25)} day={Math.floor(i / 2) % 25 + 1} part={i % 2 + 1} />
                         )
                     })}
                 </div>
@@ -43,7 +44,7 @@ function RouteComponent() {
                         <Position index={index} members={sortedMembers} />{member.score.toString().padStart(maxScore.toString().length, ' ')}{' '}
                         {_.times(puzzleCount, (_i) => {
                             const solved = Math.random() < member.score / (maxScore + 200);
-                            const firstOnly = Math.random() < 0.1;
+                            const firstOnly = false;
                             return (
                                 solved ? (<span className={firstOnly ? 'first-only' : 'gold'}>*</span>) : ' '
                             )
@@ -72,8 +73,8 @@ function Position({ index, members }: { index: number, members: Array<any> }) {
     )
 }
 
-function ColumnText({ year, day }: { year: number, day: number }) {
-    const text = `${year % 100} ${day > 9 ? '' : ' '}${day}`;
+function ColumnText({ year, day, part }: { year: number, day: number, part: number }) {
+    const text = `${year % 100} ${day > 9 ? '' : ' '}${day} ${part}`;
     return (
         <div className="inline-block">
             <a href={`https://adventofcode.com/${year}/day/${day}`} target="_blank" rel="noreferrer" title={`AoC ${year} Day ${day}`}>
