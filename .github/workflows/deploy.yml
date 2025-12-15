@@ -17,6 +17,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          cache-workspaces: backend
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -50,7 +51,7 @@ jobs:
             # SSH to internal server and deploy
             ssh mtib@100.104.3.2 << 'ENDINNER'
               set -e
-              cd aoc-bingo
+              cd containers/aoc-bingo
               git pull --ff-only
               cd ..
               docker compose up --build aoc-bingo-backend aoc-bingo-frontend -d
