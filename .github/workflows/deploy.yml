@@ -67,8 +67,9 @@ jobs:
               cd ..
               docker compose up --build aoc-bingo-backend aoc-bingo-frontend -d
 
-              # Clean up dangling images
-              docker image prune -f --filter "label=com.docker.compose.project=aoc-bingo"
+              # Clean up dangling images for aoc-bingo services
+              docker image prune -f --filter "label=com.docker.compose.service=aoc-bingo-backend"
+              docker image prune -f --filter "label=com.docker.compose.service=aoc-bingo-frontend"
           ENDINNER
           ENDSSH
 
