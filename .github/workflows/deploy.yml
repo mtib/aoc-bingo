@@ -1,0 +1,64 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Check backend (cargo check)
+        working-directory: ./backend
+        run: cargo check
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: bun install --frozen-lockfile
+
+      - name: Build frontend (bun build)
+        working-directory: ./frontend
+        run: bun run build
+
+      - name: Deploy to server
+        if: success()
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: |
+          # Setup SSH key
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/aoc_bingo_deploy_key
+          chmod 600 ~/.ssh/aoc_bingo_deploy_key
+
+          # SSH to mtib.dev and then to internal server
+          ssh -i ~/.ssh/aoc_bingo_deploy_key -o StrictHostKeyChecking=no root@mtib.dev << 'ENDSSH'
+            # SSH to internal server and deploy
+            ssh mtib@100.104.3.2 << 'ENDINNER'
+              set -e
+              cd aoc-bingo
+              git pull --ff-only
+              cd ..
+              docker compose up --build aoc-bingo-backend aoc-bingo-frontend -d
+
+              # Clean up dangling images
+              docker image prune -f --filter "label=com.docker.compose.project=aoc-bingo"
+          ENDINNER
+          ENDSSH
+
+          # Cleanup
+          rm -f ~/.ssh/aoc_bingo_deploy_key
