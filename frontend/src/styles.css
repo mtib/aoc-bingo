@@ -89,8 +89,14 @@ button:focus {
   color: #99ff99;
 }
 
+button:disabled {
+  color: #444444;
+  cursor: default;
+}
+
 p {
   max-width: 55em;
+  @apply mb-[1rem];
 }
 
 input {

@@ -21,9 +21,6 @@ export default function Header() {
             About
           </Link>
           <a href="https://github.com/mtib/aoc-bingo">GitHub</a>
-          <button onClick={() => {
-            console.log("clicked");
-          }}>Console.log</button>
         </div>
       </div>
       <Disclaimer className='mb-3' />

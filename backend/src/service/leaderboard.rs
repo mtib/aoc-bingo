@@ -51,9 +51,12 @@ impl LeaderboardService {
         {
             let conn = get_db().unwrap();
             if let Some(cached) = lbr.get_leaderboard(&conn, year, board_id) {
-                return Ok(cached);
+                if (chrono::Utc::now() - cached.updated_at).num_seconds() < 900
+                    || session_token.is_none()
+                {
+                    return Ok(cached);
+                }
             }
-
             if session_token.is_none() {
                 return Err(LeaderboardError::NotCached);
             }

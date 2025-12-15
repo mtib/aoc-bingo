@@ -1,6 +1,7 @@
 use rocket::{Config, routes};
 use rocket_cors::CorsOptions;
 
+mod game;
 mod health;
 mod leaderboard;
 
@@ -11,10 +12,12 @@ trait ConfigureRocket {
 
 impl ConfigureRocket for rocket::Rocket<rocket::Build> {
     fn mount_routes(self: Self) -> Self {
-        self.mount("/", routes![health::health]).mount(
-            "/leaderboard",
-            routes![leaderboard::index, leaderboard::bingo_all],
-        )
+        self.mount("/", routes![health::health])
+            .mount(
+                "/leaderboard",
+                routes![leaderboard::index, leaderboard::bingo_all],
+            )
+            .mount("/game", routes![game::create])
     }
 
     fn config(self: Self) -> Self {

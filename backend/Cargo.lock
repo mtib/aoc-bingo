@@ -86,6 +86,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "include_dir",
+ "rand",
  "reqwest",
  "rocket",
  "rocket_cors",

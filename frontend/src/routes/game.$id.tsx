@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import _ from 'lodash';
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
+import { useLeaderboardContext } from '@/contexts/LeaderboardContext';
 
 export const Route = createFileRoute('/game/$id')({
     component: RouteComponent,
@@ -8,6 +9,14 @@ export const Route = createFileRoute('/game/$id')({
 
 function RouteComponent() {
     const { id } = Route.useParams();
+    const { gameMemberships, setGameMemberships } = useLeaderboardContext();
+
+    // Add this game to memberships when visited
+    useEffect(() => {
+        if (!gameMemberships.includes(id)) {
+            setGameMemberships([...gameMemberships, id]);
+        }
+    }, [id, gameMemberships, setGameMemberships]);
     const members = useMemo(() => {
         return _.times(13, (i) => ({
             id: `user_${i}`,
