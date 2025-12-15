@@ -42,6 +42,7 @@ pub struct BingoAllRequest {
     ///
     /// if < 0.5 => uses `1 - difficulty` as chance to skip hard puzzles
     /// if >= 0.5 => uses `difficulty` as chance to skip easy puzzles
+    #[allow(unused)]
     difficulty: Option<f32>,
 }
 
