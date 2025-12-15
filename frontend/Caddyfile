@@ -1,5 +1,47 @@
 :80 {
     root * /srv
-    file_server
+
+    # Enable compression for faster transfers
+    encode gzip zstd
+
+    # Security headers
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # Cache Vite assets permanently (all files in /assets/ are content-hashed)
+    @assets {
+        path /assets/*
+    }
+    header @assets Cache-Control "public, max-age=31536000, immutable"
+
+    # Cache robots.txt permanently
+    @robots {
+        path /robots.txt
+    }
+    header @robots Cache-Control "public, max-age=31536000, immutable"
+
+    # Cache icons, images, and manifest for 60 minutes
+    @staticFiles {
+        path *.ico *.png
+        path /manifest.json /site.webmanifest
+    }
+    header @staticFiles Cache-Control "public, max-age=3600"
+
+    # Cache HTML files for 60 seconds
+    @html {
+        path *.html /
+    }
+    header @html Cache-Control "public, max-age=60, must-revalidate"
+
+    # Serve files with precompressed support and ETag validation
+    file_server {
+        precompressed gzip br
+    }
+
+    # SPA fallback - serve index.html for client-side routing
     try_files {path} /index.html
 }
