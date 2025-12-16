@@ -2,9 +2,10 @@ use backend::{DatabaseManager, build as build_api};
 
 #[tokio::main]
 async fn main() {
-    DatabaseManager::new().init();
+    let db_manager = DatabaseManager::new("./data/db.sqlite").expect("Failed to create database manager");
+    db_manager.init();
 
-    let rocket = build_api().ignite().await.unwrap();
+    let rocket = build_api(db_manager.get_pool().clone()).ignite().await.unwrap();
     let rocket_shutdown = rocket.shutdown();
 
     let task = tokio::task::spawn(async {

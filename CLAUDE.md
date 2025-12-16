@@ -135,3 +135,4 @@ The backend uses Rust's built-in test framework. Run all tests with `cargo test`
 ### Data Persistence
 
 The backend stores data in `./data/db.sqlite`. This directory is volume-mounted in Docker to persist data across container restarts.
+- Use doc comments where possible

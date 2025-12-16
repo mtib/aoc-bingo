@@ -40,6 +40,16 @@ impl Into<u32> for AocPart {
     }
 }
 
+impl From<u32> for AocPart {
+    fn from(value: u32) -> Self {
+        match value {
+            1 => AocPart::One,
+            2 => AocPart::Two,
+            _ => panic!("Invalid AoC part: {}", value),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Eq, serde::Serialize, serde::Deserialize, Hash)]
 pub struct PuzzleDate {
     pub year: u32,

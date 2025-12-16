@@ -1,20 +1,20 @@
 use chrono::DateTime;
-use sqlite::{Connection, Row, Value};
+use rusqlite::{params, Connection, Row};
 
 use crate::model::game::{GameDto, GameMembershipDto};
 use crate::model::leaderboard::{AocLeaderboardId, AocMemberId};
 
 pub struct GameRepository;
 
-impl TryFrom<Row> for GameDto {
-    type Error = sqlite::Error;
+impl TryFrom<&Row<'_>> for GameDto {
+    type Error = rusqlite::Error;
 
-    fn try_from(row: Row) -> Result<Self, Self::Error> {
-        let id = row.try_read::<&str, _>("id")?.to_owned();
-        let leaderboard_id: i64 = row.try_read("leaderboard_id")?;
-        let session_token = row.try_read::<&str, _>("session_token")?.to_owned();
-        let created_at: i64 = row.try_read("created_at")?;
-        let updated_at: i64 = row.try_read("updated_at")?;
+    fn try_from(row: &Row) -> Result<Self, Self::Error> {
+        let id: String = row.get("id")?;
+        let leaderboard_id: i64 = row.get("leaderboard_id")?;
+        let session_token: String = row.get("session_token")?;
+        let created_at: i64 = row.get("created_at")?;
+        let updated_at: i64 = row.get("updated_at")?;
 
         Ok(GameDto {
             id,
@@ -26,15 +26,15 @@ impl TryFrom<Row> for GameDto {
     }
 }
 
-impl TryFrom<Row> for GameMembershipDto {
-    type Error = sqlite::Error;
+impl TryFrom<&Row<'_>> for GameMembershipDto {
+    type Error = rusqlite::Error;
 
-    fn try_from(row: Row) -> Result<Self, Self::Error> {
-        let id: i64 = row.try_read("id")?;
-        let game_id = row.try_read::<&str, _>("game_id")?.to_owned();
-        let member_id: i64 = row.try_read("member_id")?;
-        let member_name = row.try_read::<&str, _>("member_name")?.to_owned();
-        let created_at: i64 = row.try_read("created_at")?;
+    fn try_from(row: &Row) -> Result<Self, Self::Error> {
+        let id: i64 = row.get("id")?;
+        let game_id: String = row.get("game_id")?;
+        let member_id: i64 = row.get("member_id")?;
+        let member_name: String = row.get("member_name")?;
+        let created_at: i64 = row.get("created_at")?;
 
         Ok(GameMembershipDto {
             id: id as u32,
@@ -58,36 +58,26 @@ impl GameRepository {
         id: &str,
         leaderboard_id: u32,
         session_token: &str,
-    ) -> Result<GameDto, sqlite::Error> {
+    ) -> Result<GameDto, rusqlite::Error> {
         let mut statement = conn.prepare(
             "INSERT INTO games (id, leaderboard_id, session_token)
-             VALUES (:id, :leaderboard_id, :session_token)
+             VALUES (?1, ?2, ?3)
              RETURNING *;",
         )?;
-        statement.bind::<&[(_, Value)]>(&[
-            (":id", id.into()),
-            (":leaderboard_id", (leaderboard_id as i64).into()),
-            (":session_token", session_token.into()),
-        ])?;
+        let mut rows = statement.query(params![id, leaderboard_id as i64, session_token])?;
 
-        match self.consume_statement_as_game(&mut statement) {
-            Ok(Some(dto)) => Ok(dto),
-            Ok(None) => panic!("Expected game to be returned after insert."),
-            Err(e) => Err(e),
+        if let Some(row) = rows.next()? {
+            GameDto::try_from(row)
+        } else {
+            panic!("Expected game to be returned after insert.")
         }
     }
 
     /// Get a game by its ID
     pub fn get_game(&self, conn: &Connection, id: &str) -> Option<GameDto> {
-        let mut statement = conn
-            .prepare("SELECT * FROM games WHERE id = :id;")
-            .unwrap();
-        statement
-            .bind::<&[(_, Value)]>(&[(":id", id.into())])
-            .unwrap();
-        self.consume_statement_as_game(&mut statement)
-            .ok()
-            .flatten()
+        let mut statement = conn.prepare("SELECT * FROM games WHERE id = ?1;").ok()?;
+        let mut rows = statement.query(params![id]).ok()?;
+        rows.next().ok()?.and_then(|row| GameDto::try_from(row).ok())
     }
 
     /// Get all games (optional - for listing/debugging)
@@ -95,18 +85,16 @@ impl GameRepository {
         let mut statement = conn
             .prepare("SELECT * FROM games ORDER BY created_at DESC;")
             .unwrap();
+        let rows = statement
+            .query_map([], |row| GameDto::try_from(row))
+            .unwrap();
 
         let mut games = Vec::new();
-        for row_result in statement.iter() {
+        for row_result in rows {
             match row_result {
-                Ok(row) => match row.try_into() {
-                    Ok(dto) => games.push(dto),
-                    Err(e) => {
-                        eprintln!("Failed to convert row to GameDto: {:?}", e);
-                    }
-                },
+                Ok(dto) => games.push(dto),
                 Err(e) => {
-                    eprintln!("Database error fetching game: {:?}", e);
+                    eprintln!("Failed to convert row to GameDto: {:?}", e);
                 }
             }
         }
@@ -120,22 +108,18 @@ impl GameRepository {
         game_id: &str,
         member_id: u32,
         member_name: &str,
-    ) -> Result<GameMembershipDto, sqlite::Error> {
+    ) -> Result<GameMembershipDto, rusqlite::Error> {
         let mut statement = conn.prepare(
             "INSERT INTO game_memberships (game_id, member_id, member_name)
-             VALUES (:game_id, :member_id, :member_name)
+             VALUES (?1, ?2, ?3)
              RETURNING *;",
         )?;
-        statement.bind::<&[(_, Value)]>(&[
-            (":game_id", game_id.into()),
-            (":member_id", (member_id as i64).into()),
-            (":member_name", member_name.into()),
-        ])?;
+        let mut rows = statement.query(params![game_id, member_id as i64, member_name])?;
 
-        match self.consume_statement_as_membership(&mut statement) {
-            Ok(Some(dto)) => Ok(dto),
-            Ok(None) => panic!("Expected membership to be returned after insert."),
-            Err(e) => Err(e),
+        if let Some(row) = rows.next()? {
+            GameMembershipDto::try_from(row)
+        } else {
+            panic!("Expected membership to be returned after insert.")
         }
     }
 
@@ -144,10 +128,22 @@ impl GameRepository {
         &self,
         conn: &Connection,
         membership_id: u32,
-    ) -> Result<(), sqlite::Error> {
-        let mut statement = conn.prepare("DELETE FROM game_memberships WHERE id = :id;")?;
-        statement.bind::<&[(_, Value)]>(&[(":id", (membership_id as i64).into())])?;
-        self.consume_statement(&mut statement)?;
+    ) -> Result<(), rusqlite::Error> {
+        conn.execute("DELETE FROM game_memberships WHERE id = ?1;", params![membership_id as i64])?;
+        Ok(())
+    }
+
+    /// Delete a membership by game_id and member_id
+    pub fn delete_membership_by_game_and_member(
+        &self,
+        conn: &Connection,
+        game_id: &str,
+        member_id: u32,
+    ) -> Result<(), rusqlite::Error> {
+        conn.execute(
+            "DELETE FROM game_memberships WHERE game_id = ?1 AND member_id = ?2;",
+            params![game_id, member_id as i64],
+        )?;
         Ok(())
     }
 
@@ -158,84 +154,21 @@ impl GameRepository {
         game_id: &str,
     ) -> Vec<GameMembershipDto> {
         let mut statement = conn
-            .prepare("SELECT * FROM game_memberships WHERE game_id = :game_id ORDER BY created_at ASC;")
+            .prepare("SELECT * FROM game_memberships WHERE game_id = ?1 ORDER BY created_at ASC;")
             .unwrap();
-        statement
-            .bind::<&[(_, Value)]>(&[(":game_id", game_id.into())])
+        let rows = statement
+            .query_map(params![game_id], |row| GameMembershipDto::try_from(row))
             .unwrap();
 
         let mut memberships = Vec::new();
-        for row_result in statement.iter() {
+        for row_result in rows {
             match row_result {
-                Ok(row) => match row.try_into() {
-                    Ok(dto) => memberships.push(dto),
-                    Err(e) => {
-                        eprintln!("Failed to convert row to GameMembershipDto: {:?}", e);
-                    }
-                },
+                Ok(dto) => memberships.push(dto),
                 Err(e) => {
-                    eprintln!("Database error fetching membership: {:?}", e);
+                    eprintln!("Failed to convert row to GameMembershipDto: {:?}", e);
                 }
             }
         }
         memberships
-    }
-
-    // Private helper methods
-    fn consume_statement(&self, statement: &mut sqlite::Statement) -> Result<(), sqlite::Error> {
-        while let Ok(state) = statement.next() {
-            if state == sqlite::State::Done {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    fn consume_statement_as_game(
-        &self,
-        statement: &mut sqlite::Statement,
-    ) -> Result<Option<GameDto>, sqlite::Error> {
-        let result = match statement.iter().next() {
-            None => Ok(None),
-            Some(row) => match row {
-                Ok(row) => match row.try_into() {
-                    Ok(dto) => Ok(Some(dto)),
-                    Err(e) => {
-                        eprintln!("Failed to convert row to GameDto: {:?}", e);
-                        Err(e)
-                    }
-                },
-                Err(e) => {
-                    eprintln!("Database error fetching game: {:?}", e);
-                    Err(e)
-                }
-            },
-        };
-        self.consume_statement(statement)?;
-        result
-    }
-
-    fn consume_statement_as_membership(
-        &self,
-        statement: &mut sqlite::Statement,
-    ) -> Result<Option<GameMembershipDto>, sqlite::Error> {
-        let result = match statement.iter().next() {
-            None => Ok(None),
-            Some(row) => match row {
-                Ok(row) => match row.try_into() {
-                    Ok(dto) => Ok(Some(dto)),
-                    Err(e) => {
-                        eprintln!("Failed to convert row to GameMembershipDto: {:?}", e);
-                        Err(e)
-                    }
-                },
-                Err(e) => {
-                    eprintln!("Database error fetching membership: {:?}", e);
-                    Err(e)
-                }
-            },
-        };
-        self.consume_statement(statement)?;
-        result
     }
 }

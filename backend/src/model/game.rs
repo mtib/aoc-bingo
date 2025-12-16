@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
 use crate::model::leaderboard::{AocLeaderboardId, AocMemberId};
+use chrono::{DateTime, Utc};
 
 /// 8-character alphanumeric game ID
 pub type GameId = String;
@@ -20,4 +20,10 @@ pub struct GameMembershipDto {
     pub member_id: AocMemberId,
     pub member_name: String,
     pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct GameLeaderboardMemberDto {
+    pub id: AocMemberId,
+    pub name: String,
 }

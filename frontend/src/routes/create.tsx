@@ -22,6 +22,7 @@ function RouteComponent() {
     const navigate = useNavigate();
 
     const validInput = useMemo(() => {
+        if (!boardId || !sessionToken) return false;
         return boardId.trim().length > 0 && sessionToken.length == 128 && /^[a-f0-9]+$/.test(sessionToken) && /^\d+$/.test(boardId);
     }, [boardId, sessionToken]);
 
@@ -29,10 +30,11 @@ function RouteComponent() {
         setIsCreating(true);
         setError(null);
         try {
+            if (!boardId || !sessionToken || !gameMemberships) return;
             const game = await createGame(parseInt(boardId), sessionToken);
             // Add to memberships if not already present
-            if (!gameMemberships.includes(game.id)) {
-                setGameMemberships([...gameMemberships, game.id]);
+            if (!gameMemberships.some(g => g.id === game.id)) {
+                setGameMemberships([...gameMemberships, { id: game.id, admin: true }]);
             }
             // Navigate to the new game
             navigate({ to: '/game/$id', params: { id: game.id } });
@@ -58,8 +60,8 @@ function RouteComponent() {
             </div>
             <h2>Settings</h2>
             <div className="flex flex-col gap-4">
-                <p>Leaderboard id: <input type="text" value={boardId} onChange={(e) => setBoardId(e.target.value.trim())} /></p>
-                <p>Session token: <input type="text" value={sessionToken} onChange={(e) => setSessionToken(e.target.value.trim())} /></p>
+                <p>Leaderboard id: <input type="text" value={boardId || ''} onChange={(e) => setBoardId(e.target.value.trim())} /></p>
+                <p>Session token: <input type="text" value={sessionToken || ''} onChange={(e) => setSessionToken(e.target.value.trim())} /></p>
                 {error && <p className="text-red-500">{error}</p>}
                 <p><button disabled={!validInput || isCreating} onClick={handleCreate}>
                     {isCreating ? 'Creating...' : 'Create'}

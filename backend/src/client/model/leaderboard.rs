@@ -27,5 +27,5 @@ pub struct MemberResponse {
 #[derive(Clone, serde::Deserialize, serde::Serialize, Debug)]
 pub struct StarInfoResponse {
     pub get_star_ts: u64,
-    pub star_index: u32,
+    pub star_index: Option<u32>,
 }

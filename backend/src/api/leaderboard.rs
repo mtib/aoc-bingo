@@ -1,6 +1,7 @@
-use rocket::{http::Status, post, serde::json::Json};
+use rocket::{State, http::Status, post, serde::json::Json};
 
 use crate::{
+    db::DbPool,
     model::leaderboard::{
         AocMemberId, LeaderboardDto, ShuffleLeaderboardDataDto, ShuffleLeaderboardDayDto,
         ShuffleLeaderboardDto,
@@ -17,13 +18,14 @@ pub struct LeaderboardRequest {
 
 #[post("/", data = "<req>")]
 pub async fn index(
+    pool: &State<DbPool>,
     req: Json<LeaderboardRequest>,
 ) -> Result<Json<LeaderboardDto>, (Status, String)> {
     let req = req.into_inner();
 
     let result = {
         let lbs = LeaderboardService::new();
-        lbs.get_or_create_leaderboard(req.year, req.board_id, Some(&req.session_token))
+        lbs.get_or_create_leaderboard(pool, req.year, req.board_id, Some(&req.session_token))
             .await
     };
 
@@ -48,6 +50,7 @@ pub struct BingoAllRequest {
 
 #[post("/bingo/all", data = "<req>")]
 pub async fn bingo_all(
+    pool: &State<DbPool>,
     req: Json<BingoAllRequest>,
 ) -> Result<Json<ShuffleLeaderboardDto>, (Status, String)> {
     let req = req.into_inner();
@@ -55,10 +58,12 @@ pub async fn bingo_all(
     let puzzles_result = {
         let lbs = LeaderboardService::new();
         lbs.get_bingo_options(
+            pool,
             None,
             req.board_id,
             Some(&req.session_token),
             Some(&req.member_ids),
+            None,
         )
         .await
     };

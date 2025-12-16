@@ -8,6 +8,8 @@ export const Route = createFileRoute('/games')({
 function RouteComponent() {
     const { gameMemberships } = useLeaderboardContext();
 
+    if (!gameMemberships) return null;
+
     return (
         <>
             <h1>Games</h1>
@@ -16,17 +18,21 @@ function RouteComponent() {
                 <p>You're not part of any games. You can <Link to="/create">create one</Link>.</p>
             ) : (
                 <>
+                    <p>You can create games <Link to="/create">here</Link>. Once created you can add players to them.</p>
                     <h2>Your Games</h2>
                     <ul>
-                        {gameMemberships.map((gameId) => (
-                            <li key={gameId}>
-                                <Link to="/game/$id" params={{ id: gameId }}>
-                                    Game {gameId}
+                        {gameMemberships.map((game) => (
+                            <li key={game.id}>
+                                Game{' '}
+                                <Link to="/game/$id" params={{ id: game.id }}>
+                                    {game.id}
                                 </Link>
+                                {game.admin && <>
+                                    {' '}<span className='quiet'>(admin)</span>
+                                </>}
                             </li>
                         ))}
                     </ul>
-                    <p><Link to="/create">Create another game</Link></p>
                 </>
             )}
         </>

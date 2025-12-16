@@ -2,14 +2,12 @@ use std::fs;
 
 use chrono::DateTime;
 use include_dir::Dir;
-use sqlite::{Connection, Value};
+use rusqlite::params;
+
+use super::pool::{DbConnection, DbPool, create_pool};
 
 pub struct DatabaseManager {
-    connection: sqlite::Connection,
-}
-
-pub fn get_db() -> Result<Connection, DbError> {
-    DatabaseManager::open_connection()
+    pool: DbPool,
 }
 
 static MIGRATION_DIR: Dir<'static> =
@@ -21,79 +19,66 @@ pub enum DbError {
     #[allow(dead_code)]
     Unexpected(String),
     #[error("SQLite error: {0}")]
-    SqliteError(#[from] sqlite::Error),
+    SqliteError(#[from] rusqlite::Error),
     #[error("Fs error: {0}")]
     FsError(#[from] std::io::Error),
+    #[error("Pool error: {0}")]
+    PoolError(#[from] r2d2::Error),
 }
 
 impl DatabaseManager {
-    pub fn new() -> Self {
-        DatabaseManager {
-            connection: DatabaseManager::open_connection().unwrap(),
-        }
-    }
-
-    pub fn get_connection(&self) -> &sqlite::Connection {
-        &self.connection
-    }
-
-    fn open_connection() -> Result<sqlite::Connection, DbError> {
+    pub fn new(db_path: &str) -> Result<Self, DbError> {
         fs::create_dir_all("./data").map_err(DbError::FsError)?;
-        let db_path = "./data/db.sqlite";
-        let db_exists = fs::metadata(db_path).is_ok();
-        let conn = sqlite::open(db_path).map_err(DbError::SqliteError)?;
-        if !db_exists {
-            conn.execute("PRAGMA journal_mode=WAL;")?;
-        }
-        Ok(conn)
+        let pool = create_pool(db_path)?;
+        Ok(DatabaseManager { pool })
+    }
+
+    pub fn get_connection(&self) -> Result<DbConnection, DbError> {
+        self.pool.get().map_err(DbError::PoolError)
+    }
+
+    pub fn get_pool(&self) -> &DbPool {
+        &self.pool
     }
 
     fn setup_migration_table(&self) -> Result<(), DbError> {
         println!("Setting up migration table...");
-        self.connection
-            .execute(
-                "CREATE TABLE IF NOT EXISTS migrations (
+        let conn = self.get_connection()?;
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS migrations (
                 id TEXT PRIMARY KEY,
                 applied_at INTEGER DEFAULT (unixepoch())
             );",
-            )
-            .map_err(DbError::SqliteError)?;
+            [],
+        )?;
         Ok(())
     }
 
     fn get_applied_migrations(&self) -> Result<Vec<String>, DbError> {
-        let mut stmt = self
-            .connection
-            .prepare("SELECT id FROM migrations ORDER BY id;")
-            .map_err(DbError::SqliteError)?;
-        let mut rows = stmt.iter();
+        let conn = self.get_connection()?;
+        let mut stmt = conn.prepare("SELECT id FROM migrations ORDER BY id;")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
         let mut applied_migrations = Vec::new();
-        while let Some(Ok(row)) = rows.next() {
-            let id = row.read::<&str, _>("id").to_owned();
-            applied_migrations.push(id);
+        for id_result in rows {
+            applied_migrations.push(id_result?);
         }
         Ok(applied_migrations)
     }
 
     fn apply_migration(&self, migration_id: &str, migration_sql: &str) {
         println!("Applying migration: {}", migration_id);
-        self.connection.execute(migration_sql).unwrap();
+        let conn = self.get_connection().unwrap();
+        conn.execute_batch(migration_sql).unwrap();
 
-        let mut statement = self
-            .connection
-            .prepare("INSERT INTO migrations (id) VALUES (:id) RETURNING *;")
+        let mut statement = conn
+            .prepare("INSERT INTO migrations (id) VALUES (?1) RETURNING *;")
             .unwrap();
-        statement
-            .bind::<&[(_, Value)]>(&[(":id", migration_id.into())])
-            .unwrap();
-        for row in statement.iter() {
-            if row.is_err() {
-                continue;
-            }
-            let row = row.unwrap();
-            let applied_id = row.read::<&str, _>("id");
-            let applied_at =
-                DateTime::from_timestamp_secs(row.read::<i64, _>("applied_at")).unwrap();
+        let mut rows = statement.query(params![migration_id]).unwrap();
+
+        if let Some(row) = rows.next().unwrap() {
+            let applied_id: String = row.get(0).unwrap();
+            let applied_at_secs: i64 = row.get(1).unwrap();
+            let applied_at = DateTime::from_timestamp(applied_at_secs, 0).unwrap();
             println!(
                 "Migration applied: id={}, applied_at={}",
                 applied_id, applied_at

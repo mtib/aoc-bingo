@@ -1,28 +1,28 @@
 use chrono::DateTime;
-use sqlite::{Connection, Row, Value};
+use rusqlite::{Connection, Row, params};
 
 use crate::model::leaderboard::{AocLeaderboardId, AocLeaderboardYearId, LeaderboardDto, Year};
 
 pub struct LeaderboardRepository;
 
-impl TryFrom<Row> for LeaderboardDto {
-    type Error = sqlite::Error;
+impl TryFrom<&Row<'_>> for LeaderboardDto {
+    type Error = rusqlite::Error;
 
-    fn try_from(row: Row) -> Result<Self, Self::Error> {
-        let id: i64 = row.try_read("id")?;
-        let year: i64 = row.try_read("year")?;
-        let board_id: i64 = row.try_read("leaderboard_id")?;
-        let data = row.try_read::<&str, _>("data")?.to_owned();
-        let created_at = row.try_read::<i64, _>("created_at")?.to_owned();
-        let updated_at = row.try_read::<i64, _>("updated_at")?.to_owned();
+    fn try_from(row: &Row) -> Result<Self, Self::Error> {
+        let id: i64 = row.get("id")?;
+        let year: i64 = row.get("year")?;
+        let board_id: i64 = row.get("leaderboard_id")?;
+        let data: String = row.get("data")?;
+        let created_at: i64 = row.get("created_at")?;
+        let updated_at: i64 = row.get("updated_at")?;
 
         Ok(LeaderboardDto {
             id: id as AocLeaderboardYearId,
             year: year as Year,
             board_id: board_id as AocLeaderboardId,
             data: serde_json::from_str(&data).unwrap(),
-            created_at: DateTime::from_timestamp_secs(created_at).unwrap(),
-            updated_at: DateTime::from_timestamp_secs(updated_at).unwrap(),
+            created_at: DateTime::from_timestamp(created_at, 0).unwrap(),
+            updated_at: DateTime::from_timestamp(updated_at, 0).unwrap(),
         })
     }
 }
@@ -38,25 +38,21 @@ impl LeaderboardRepository {
         year: u32,
         board_id: u32,
         data: &str,
-    ) -> Result<LeaderboardDto, sqlite::Error> {
+    ) -> Result<LeaderboardDto, rusqlite::Error> {
         let mut statement = conn.prepare(
             "INSERT INTO leaderboard_cache (year, leaderboard_id, data)
-             VALUES (:year, :board_id, :data)
+             VALUES (?1, ?2, ?3)
              ON CONFLICT(year, leaderboard_id) DO UPDATE SET
-             data = :data,
-             updated_at = :updated_at
+             data = ?3
              RETURNING *;",
         )?;
-        statement.bind::<&[(_, Value)]>(&[
-            (":year", (year as i64).into()),
-            (":board_id", (board_id as i64).into()),
-            (":data", data.into()),
-        ])?;
 
-        match self.consume_statement_as_leaderboard(&mut statement) {
-            Ok(Some(dto)) => Ok(dto),
-            Ok(None) => panic!("Expected leaderboard to be returned after insert/update."),
-            Err(e) => Err(e),
+        let mut rows = statement.query(params![year as i64, board_id as i64, data])?;
+
+        if let Some(row) = rows.next()? {
+            LeaderboardDto::try_from(row)
+        } else {
+            panic!("Expected leaderboard to be returned after insert/update.")
         }
     }
 
@@ -67,17 +63,15 @@ impl LeaderboardRepository {
         board_id: u32,
     ) -> Option<LeaderboardDto> {
         let mut statement = conn
-            .prepare("SELECT * FROM leaderboard_cache WHERE year = :year AND leaderboard_id = :board_id;")
-            .unwrap();
-        statement
-            .bind::<&[(_, Value)]>(&[
-                (":year", (year as i64).into()),
-                (":board_id", (board_id as i64).into()),
-            ])
-            .unwrap();
-        self.consume_statement_as_leaderboard(&mut statement)
-            .ok()
-            .flatten()
+            .prepare("SELECT * FROM leaderboard_cache WHERE year = ?1 AND leaderboard_id = ?2;")
+            .ok()?;
+        let mut rows = statement
+            .query(params![year as i64, board_id as i64])
+            .ok()?;
+
+        rows.next()
+            .ok()?
+            .and_then(|row| LeaderboardDto::try_from(row).ok())
     }
 
     pub fn get_all_leaderboard_by_id(
@@ -86,65 +80,26 @@ impl LeaderboardRepository {
         board_id: u32,
     ) -> Vec<LeaderboardDto> {
         let mut statement = conn
-            .prepare("SELECT * FROM leaderboard_cache WHERE leaderboard_id = :board_id ORDER BY year ASC;")
+            .prepare("SELECT * FROM leaderboard_cache WHERE leaderboard_id = ?1 ORDER BY year ASC;")
             .unwrap();
-        statement
-            .bind::<&[(_, Value)]>(&[(":board_id", (board_id as i64).into())])
+        let rows = statement
+            .query_map(params![board_id as i64], |row| {
+                LeaderboardDto::try_from(row)
+            })
             .unwrap();
 
         let mut leaderboards = Vec::new();
-        for row_result in statement.iter() {
+        for row_result in rows {
             match row_result {
-                Ok(row) => match row.try_into() {
-                    Ok(dto) => leaderboards.push(dto),
-                    Err(e) => {
-                        eprintln!(
-                            "Failed to convert row to LeaderboardDto for board_id={}: {:?}",
-                            board_id, e
-                        );
-                    }
-                },
+                Ok(dto) => leaderboards.push(dto),
                 Err(e) => {
                     eprintln!(
-                        "Database error fetching leaderboard for board_id={}: {:?}",
+                        "Failed to convert row to LeaderboardDto for board_id={}: {:?}",
                         board_id, e
                     );
                 }
             }
         }
         leaderboards
-    }
-
-    fn consume_statement(&self, statement: &mut sqlite::Statement) -> Result<(), sqlite::Error> {
-        while let Ok(state) = statement.next() {
-            if state == sqlite::State::Done {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    fn consume_statement_as_leaderboard(
-        &self,
-        statement: &mut sqlite::Statement,
-    ) -> Result<Option<LeaderboardDto>, sqlite::Error> {
-        let result = match statement.iter().next() {
-            None => Ok(None),
-            Some(row) => match row {
-                Ok(row) => match row.try_into() {
-                    Ok(dto) => Ok(Some(dto)),
-                    Err(e) => {
-                        eprintln!("Failed to convert row to LeaderboardDto: {:?}", e);
-                        Err(e)
-                    }
-                },
-                Err(e) => {
-                    eprintln!("Database error fetching leaderboard: {:?}", e);
-                    Err(e)
-                }
-            },
-        };
-        self.consume_statement(statement)?;
-        result
     }
 }

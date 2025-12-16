@@ -5,9 +5,9 @@ export default function Header() {
 
   return (
     <>
-      <div className="flex gap-3 align-center mb-3">
-        <em>AoC-bingo</em>
-        <div className="flex flex-wrap gap-x-3 max-w-[400px]">
+      <div className="flex gap-3 align-center mb-3 max-w-[55em]">
+        <em>AoC Bingo</em>
+        <div className="flex flex-wrap gap-x-3 flex-shrink flex-grow">
           <Link to="/">
             Home
           </Link>
