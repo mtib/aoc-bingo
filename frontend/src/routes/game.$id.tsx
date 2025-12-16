@@ -67,7 +67,7 @@ function RouteComponent() {
      * Query completion data for all game members
      * Returns which puzzles each member has completed
      */
-    const { data: completionData } = useQuery({
+    const { data: completionData, isLoading: isCompletionLoading } = useQuery({
         queryKey: ['gameCompletion', id],
         queryFn: async ({ queryKey }) => {
             const id = queryKey[1];
@@ -197,34 +197,37 @@ function RouteComponent() {
             </>)}
             <h2>Leaderboard</h2>
             <div>
-                <div className='pre'>
-                    {" ".repeat((members || []).length.toString().length + maxScore.toString().length + 1)}<div className='inline-block'>{'Y\nY\n\nD\nD\n\nP '}</div>{puzzlesData?.puzzles.map((puzzle) => {
-                        return (
-                            <ColumnText key={`${puzzle.date.year}-${puzzle.date.day}-${puzzle.part}`} year={puzzle.date.year} day={puzzle.date.day} part={puzzle.part == 'One' ? 1 : 2} />
-                        )
-                    })}
-                </div>
+                {isCompletionLoading ? (<p>Loading completion data...</p>) : (
+                    <>
+                        <div className='pre'>
+                            {" ".repeat((members || []).length.toString().length + maxScore.toString().length + 1)}<div className='inline-block'>{'Y\nY\n\nD\nD\n\nP '}</div>{puzzlesData?.puzzles.map((puzzle) => {
+                                return (
+                                    <ColumnText key={`${puzzle.date.year}-${puzzle.date.day}-${puzzle.part}`} year={puzzle.date.year} day={puzzle.date.day} part={puzzle.part == 'One' ? 1 : 2} />
+                                )
+                            })}
+                        </div>
 
-                {sortedMembers.map((member, index) => (
-                    <div key={member.id} className='pre'>
-                        <Position index={index} members={sortedMembers} />{member.score.toString().padStart(maxScore.toString().length, ' ')}{' '}
-                        {puzzlesData?.puzzles.map((puzzle, i) => {
-                            // Check if this member has completed this puzzle
-                            const memberCompletions = completionData?.[member.member_id] || [];
-                            const solved = memberCompletions.some(([year, day, part]) =>
-                                year === puzzle.date.year &&
-                                day === puzzle.date.day &&
-                                part === puzzle.part
-                            );
-                            const firstOnly = false;
-                            return (
-                                solved ? (<span key={`${member.id}-${i}`} className={firstOnly ? 'first-only' : 'gold'}>*</span>) : ' '
-                            )
-                        })}
-                        {' '}{member.member_name}
-                    </div>
-                ))}
-
+                        {sortedMembers.map((member, index) => (
+                            <div key={member.id} className='pre'>
+                                <Position index={index} members={sortedMembers} />{member.score.toString().padStart(maxScore.toString().length, ' ')}{' '}
+                                {puzzlesData?.puzzles.map((puzzle, i) => {
+                                    // Check if this member has completed this puzzle
+                                    const memberCompletions = completionData?.[member.member_id] || [];
+                                    const solved = memberCompletions.some(([year, day, part]) =>
+                                        year === puzzle.date.year &&
+                                        day === puzzle.date.day &&
+                                        part === puzzle.part
+                                    );
+                                    const firstOnly = false;
+                                    return (
+                                        solved ? (<span key={`${member.id}-${i}`} className={firstOnly ? 'first-only' : 'gold'}>*</span>) : ' '
+                                    )
+                                })}
+                                {' '}{member.member_name}
+                            </div>
+                        ))}
+                    </>
+                )}
             </div>
         </>
     )
