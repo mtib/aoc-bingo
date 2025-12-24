@@ -60,7 +60,7 @@ jobs:
           # SSH to mtib.dev and then to internal server
           ssh -i ~/.ssh/aoc_bingo_deploy_key -o StrictHostKeyChecking=no root@mtib.dev << 'ENDSSH'
             # SSH to internal server and deploy
-            ssh mtib@100.104.3.2 << 'ENDINNER'
+            ssh mtib@100.104.3.12 << 'ENDINNER'
               set -e
               cd containers/aoc-bingo
               git pull --ff-only
