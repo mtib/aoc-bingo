@@ -1,9 +1,17 @@
+# Pull requests run only on GitHub-hosted runners (this repo is public: a fork PR must never reach the self-hosted lab host).
+# On push to main the self-hosted runner on the lab builds the amd64 images and pushes them to the private registry, then the NAS
+# pulls them, swaps the containers, waits for healthy and drops the old images (scripts/deploy.sh). Nothing is built on the NAS.
 name: Build and Deploy
 
 on:
+  pull_request: {}
   push:
     branches:
       - main
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }} # never cancel a deploy halfway
 
 jobs:
   check-backend:
@@ -43,35 +51,29 @@ jobs:
         working-directory: ./frontend
         run: bun run build
 
-  deploy:
-    runs-on: ubuntu-latest
+  image:
     needs: [check-backend, build-frontend]
-
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, laptop-lab, docker]
+    timeout-minutes: 30
+    concurrency: { group: image-aoc-bingo, cancel-in-progress: false }
     steps:
-      - name: Deploy to server
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-        run: |
-          # Setup SSH key
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/aoc_bingo_deploy_key
-          chmod 600 ~/.ssh/aoc_bingo_deploy_key
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: |
+          docker build -t registry.vpn.mm/aoc-bingo-backend:latest backend
+          docker build -t registry.vpn.mm/aoc-bingo-frontend:latest --build-arg VITE_BACKEND_URL=https://api.aoc.mtib.dev frontend
+          docker push registry.vpn.mm/aoc-bingo-backend:latest
+          docker push registry.vpn.mm/aoc-bingo-frontend:latest
+          # the previous images are dangling now: drop them (the build cache stays, it makes the next build fast)
+          docker image prune -f | tail -1
 
-          # SSH to mtib.dev and then to internal server
-          ssh -i ~/.ssh/aoc_bingo_deploy_key -o StrictHostKeyChecking=no root@mtib.dev << 'ENDSSH'
-            # SSH to internal server and deploy
-            ssh mtib@100.104.3.12 << 'ENDINNER'
-              set -e
-              cd containers/aoc-bingo
-              git pull --ff-only
-              cd ..
-              docker compose --profile aoc-bingo up --build -d
-
-              # Clean up dangling images for aoc-bingo services
-              docker image prune -f --filter "label=com.docker.compose.service=aoc-bingo-backend"
-              docker image prune -f --filter "label=com.docker.compose.service=aoc-bingo-frontend"
-          ENDINNER
-          ENDSSH
-
-          # Cleanup
-          rm -f ~/.ssh/aoc_bingo_deploy_key
+  deploy:
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, laptop-lab, docker]
+    timeout-minutes: 20
+    concurrency: { group: deploy-aoc-bingo, cancel-in-progress: false }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # the NAS pulls both images from its own registry, swaps the containers, waits for healthy and drops the old images
+      - run: scripts/deploy.sh
